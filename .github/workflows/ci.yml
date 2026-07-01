@@ -1,0 +1,115 @@
+name: CarbonLedger CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-test:
+    name: Backend Lint, Test and Coverage
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: carbonledger_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov web3 eth-account
+
+      - name: Run Python Lint (flake8/black check)
+        run: |
+          pip install flake8 black
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 app --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings
+          flake8 app --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Run Backend Tests
+        env:
+          ENVIRONMENT: testing
+          DATABASE_URL: sqlite:///
+          SECRET_KEY: testsecretkeytestsecretkeytestsecretkeytestsecretkey
+          REDIS_URL: redis://localhost:6379/0
+          BLOCKCHAIN_ENABLED: "False"
+        run: |
+          python -m pytest tests/ --cov=app --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  frontend-build:
+    name: Frontend Lint and Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run Frontend Lint
+        run: bun run lint
+        continue-on-error: true
+
+      - name: Build Frontend Application
+        run: bun run build
+
+  smart-contracts:
+    name: Smart Contract Compile and Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Hardhat dependencies
+        run: |
+          npm ci
+
+      - name: Compile Smart Contracts
+        run: npx hardhat compile
+
+      - name: Run Contract Tests
+        run: npx hardhat test

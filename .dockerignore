@@ -1,0 +1,50 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Python environment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*,cover
+.hypothesis/
+.pytest_cache/
+
+# Node environment (Frontend)
+node_modules/
+dist/
+build/
+.svelte-kit/
+.vercel/
+bun.lock
+bunfig.toml
+package.json
+eslint.config.js
+tsconfig.json
+vite.config.ts
+
+# Configuration / Local assets
+.env
+*.db
+*.sqlite
+.agents/
+.gemini/
+C:/Users/Asus/.gemini/
+C:\Users\Asus\.gemini/
+artifacts/
+.lovable/
+README.md
+docs/
