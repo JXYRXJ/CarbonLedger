@@ -7,6 +7,8 @@ from app.core.config import settings
 
 logger = logging.getLogger("app.services.cache")
 
+_USE_SETTINGS = object()
+
 
 class CacheService:
     """
@@ -16,8 +18,12 @@ class CacheService:
     def __init__(self, redis_url: Optional[str] = None) -> None:
         self.redis_client = None
         self._in_memory_db: Dict[str, Tuple[str, float]] = {}  # key -> (json_val, expire_time)
-        
-        url = redis_url or settings.REDIS_URL
+
+        if redis_url is None:
+            url = settings.REDIS_URL
+        else:
+            url = redis_url
+
         if url:
             try:
                 import redis
