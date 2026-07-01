@@ -15,11 +15,11 @@ class CacheService:
     Production-ready Caching service backed by Redis.
     Provides automatic fallback to an in-memory database dictionary if Redis is unavailable.
     """
-    def __init__(self, redis_url: Optional[str] = None) -> None:
+    def __init__(self, redis_url: Any = _USE_SETTINGS) -> None:
         self.redis_client = None
         self._in_memory_db: Dict[str, Tuple[str, float]] = {}  # key -> (json_val, expire_time)
 
-        if redis_url is None:
+        if redis_url is _USE_SETTINGS:
             url = settings.REDIS_URL
         else:
             url = redis_url
