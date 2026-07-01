@@ -101,15 +101,19 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
+          cache-dependency-path: blockchain/package-lock.json
 
       - name: Install Hardhat dependencies
+        working-directory: blockchain
         run: |
           npm ci
 
       - name: Compile Smart Contracts
+        working-directory: blockchain
         run: npx hardhat compile
 
       - name: Run Contract Tests
+        working-directory: blockchain
         run: npx hardhat test
