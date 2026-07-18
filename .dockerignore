@@ -13,38 +13,20 @@ env/
 venv/
 .venv/
 pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.cache
-nosetests.xml
-coverage.xml
-*,cover
-.hypothesis/
 .pytest_cache/
+.coverage
 
-# Node environment (Frontend)
+# Node environment & Frontend artifacts
 node_modules/
 dist/
 build/
-.svelte-kit/
 .vercel/
-bun.lock
-bunfig.toml
-package.json
-eslint.config.js
-tsconfig.json
-vite.config.ts
 
-# Configuration / Local assets
+# Configuration / Local secrets
 .env
+.env.*
+!.env.example
 *.db
 *.sqlite
-.agents/
-.gemini/
-C:/Users/Asus/.gemini/
-C:\Users\Asus\.gemini/
-artifacts/
+scratch/
 .lovable/
-README.md
-docs/
