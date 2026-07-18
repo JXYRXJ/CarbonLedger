@@ -25,8 +25,12 @@ else:
     engine_kwargs["max_overflow"] = 20
     engine_kwargs["pool_timeout"] = 30
 
+db_url = settings.DATABASE_URL
+if db_url and db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
 engine = create_engine(
-    settings.DATABASE_URL,
+    db_url,
     connect_args=connect_args,
     **engine_kwargs
 )

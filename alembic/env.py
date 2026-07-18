@@ -29,6 +29,8 @@ def run_migrations_offline() -> None:
     we don't even need a DBAPI to be available.
     """
     url = settings.DATABASE_URL
+    if url and url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -50,7 +52,10 @@ def run_migrations_online() -> None:
     configuration = config.get_section(config.config_ini_section)
     if configuration is None:
         configuration = {}
-    configuration["sqlalchemy.url"] = settings.DATABASE_URL
+    db_url = settings.DATABASE_URL
+    if db_url and db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    configuration["sqlalchemy.url"] = db_url
 
     connectable = engine_from_config(
         configuration,
