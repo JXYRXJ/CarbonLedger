@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Any
 from fastapi import APIRouter, Depends, status
 
 from app.core.dependencies import get_current_admin, get_current_active_user, get_pagination_params, get_service
@@ -15,12 +15,12 @@ from app.services.services import BatchService, ProjectService, RegistryService,
 router = APIRouter(prefix="/batches", tags=["Credit Batches"])
 
 
-@router.get("", response_model=APIResponse[PaginatedResponse[CreditBatchResponse]])
+@router.get("", response_model=APIResponse[PaginatedResponse[Any]])
 def list_batches(
     pagination: PaginationParams = Depends(get_pagination_params),
     current_user: User = Depends(get_current_active_user),
     batch_service: BatchService = Depends(get_service(BatchService, BatchRepository))
-) -> APIResponse[PaginatedResponse[CreditBatchResponse]]:
+):
     """
     Retrieves a paginated list of carbon credit batches issued on the platform.
     Supports query filters, search strings, sorting, and pagination.
@@ -49,9 +49,41 @@ def list_batches(
         order=pagination.order
     )
     
+    items_data = []
+    for b in batches:
+        project = b.project
+        items_data.append({
+            "id": str(b.id),
+            "project_id": str(b.project_id),
+            "batch_number": b.batch_number,
+            "vintage_year": b.vintage_year,
+            "total_credits": float(b.total_credits),
+            "remaining_credits": float(b.remaining_credits),
+            "issuance_date": b.issuance_date.isoformat() if b.issuance_date else None,
+            "status": b.status.value if hasattr(b.status, "value") else b.status,
+            "created_at": b.created_at.isoformat(),
+            "updated_at": b.updated_at.isoformat(),
+            
+            # camelCase mappings for React frontend
+            "batchNumber": b.batch_number,
+            "vintageYear": b.vintage_year,
+            "totalCredits": float(b.total_credits),
+            "remainingCredits": float(b.remaining_credits),
+            "verificationStandard": project.verification_standard if project else None,
+            "projectName": project.name if project else None,
+            
+            # Nested relations
+            "project": {
+                "id": str(project.id) if project else None,
+                "name": project.name if project else None,
+                "project_code": project.project_code if project else None,
+                "country": project.country if project else None,
+            } if project else None,
+        })
+
     pages = (total + pagination.limit - 1) // pagination.limit if pagination.limit > 0 else 0
     paginated_data = PaginatedResponse(
-        items=[CreditBatchResponse.model_validate(b) for b in batches],
+        items=items_data,
         pagination=PaginationMetadata(
             total=total,
             page=pagination.page,
@@ -106,6 +138,35 @@ def get_batch_details(
     ownerships = ownership_service.get_batch_ownerships(batch_id)
     stats = batch_service.get_batch_statistics(batch_id)
 
+    # Query active marketplace listing for this batch
+    db = batch_service.repository.db
+    from app.models.models import MarketplaceListing, Ownership
+    from sqlalchemy import select
+    
+    listing_obj = db.execute(
+        select(MarketplaceListing)
+        .join(Ownership)
+        .where(
+            Ownership.batch_id == batch.id,
+            MarketplaceListing.status == "PUBLISHED"
+        )
+    ).scalar_one_or_none()
+    
+    listing_data = {
+        "id": str(listing_obj.id),
+        "ownership_id": str(listing_obj.ownership_id),
+        "seller_company_id": str(listing_obj.seller_company_id),
+        "credits_for_sale": float(listing_obj.credits_for_sale),
+        "price_per_credit": float(listing_obj.price_per_credit),
+        "minimum_purchase": float(listing_obj.minimum_purchase),
+        "description": listing_obj.description,
+        "status": listing_obj.status.value if hasattr(listing_obj.status, "value") else listing_obj.status,
+        
+        # camelCase mappings
+        "availableCredits": float(listing_obj.credits_for_sale),
+        "pricePerCredit": float(listing_obj.price_per_credit),
+    } if listing_obj else None
+
     ownership_dist = []
     for own in ownerships:
         comp = company_service.repository.find_by_id(own.company_id)
@@ -115,15 +176,49 @@ def get_batch_details(
             "company_name": comp.name if comp else "Unknown Company",
             "owned_credits": float(own.owned_credits),
             "percentage": (float(own.owned_credits) / float(batch.total_credits) * 100.0) if batch.total_credits > 0 else 0.0,
-            "average_purchase_price": float(own.average_purchase_price)
+            "average_purchase_price": float(own.average_purchase_price) if own.average_purchase_price is not None else None
         })
 
     data = {
+        # Raw model details (flat)
+        "id": str(batch.id),
+        "project_id": str(batch.project_id),
+        "batch_number": batch.batch_number,
+        "vintage_year": batch.vintage_year,
+        "total_credits": float(batch.total_credits),
+        "remaining_credits": float(batch.remaining_credits),
+        "issuance_date": batch.issuance_date.isoformat() if batch.issuance_date else None,
+        "status": batch.status.value if hasattr(batch.status, "value") else batch.status,
+        
+        # camelCase mappings for React frontend
+        "batchNumber": batch.batch_number,
+        "vintageYear": batch.vintage_year,
+        "totalCredits": float(batch.total_credits),
+        "remainingCredits": float(batch.remaining_credits),
+        "verificationStandard": project.verification_standard if project else None,
+        "projectName": project.name if project else None,
+        "description": project.description if project else None,
+        
+        # Nested relations
+        "project": {
+            "id": str(project.id) if project else None,
+            "name": project.name if project else None,
+            "project_code": project.project_code if project else None,
+            "country": project.country if project else None,
+            "verification_standard": project.verification_standard if project else None,
+        } if project else None,
+        
+        "registry": {
+            "id": str(registry.id) if registry else None,
+            "name": registry.name if registry else None,
+        } if registry else None,
+        
+        "listing": listing_data,
+        
+        # Original keys
         "batch": CreditBatchResponse.model_validate(batch).model_dump(),
-        "project": CarbonProjectResponse.model_validate(project).model_dump(),
-        "registry": RegistryResponse.model_validate(registry).model_dump(),
         "ownership_distribution": ownership_dist,
-        "current_status": batch.status,
+        "current_status": batch.status.value if hasattr(batch.status, "value") else batch.status,
         "statistics": stats
     }
     

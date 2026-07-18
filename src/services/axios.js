@@ -5,6 +5,13 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+const unwrapApiPayload = (payload) => {
+  if (payload && typeof payload === "object" && "data" in payload && "success" in payload) {
+    return payload.data;
+  }
+  return payload;
+};
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("cl_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -19,7 +26,12 @@ const flush = (err, token) => {
 };
 
 api.interceptors.response.use(
-  (r) => r,
+  (response) => {
+    if (response?.data) {
+      return { ...response, data: unwrapApiPayload(response.data) };
+    }
+    return response;
+  },
   async (error) => {
     const original = error.config;
     if (error.response?.status === 401 && !original._retry) {
@@ -39,13 +51,17 @@ api.interceptors.response.use(
       try {
         const refresh = localStorage.getItem("cl_refresh");
         if (!refresh) throw new Error("no refresh token");
-        const { data } = await axios.post(
+        const { data: refreshPayload } = await axios.post(
           `${import.meta.env.VITE_API_URL || "/api"}/auth/refresh`,
-          { refreshToken: refresh }
+          { refresh_token: refresh }
         );
-        localStorage.setItem("cl_token", data.token);
-        flush(null, data.token);
-        original.headers.Authorization = `Bearer ${data.token}`;
+        const refreshData = unwrapApiPayload(refreshPayload);
+        const nextToken = refreshData?.access_token || refreshData?.token;
+        const nextRefreshToken = refreshData?.refresh_token || refresh;
+        localStorage.setItem("cl_token", nextToken);
+        localStorage.setItem("cl_refresh", nextRefreshToken);
+        flush(null, nextToken);
+        original.headers.Authorization = `Bearer ${nextToken}`;
         return api(original);
       } catch (e) {
         flush(e, null);

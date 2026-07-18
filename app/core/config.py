@@ -7,9 +7,11 @@ from typing_extensions import Annotated
 
 def parse_cors_origins(v: Union[str, List[str]]) -> List[str]:
     if isinstance(v, str) and not v.startswith("["):
-        return [i.strip() for i in v.split(",")]
-    elif isinstance(v, (list, str)):
-        return v
+        return [i.strip().rstrip("/") for i in v.split(",") if i.strip()]
+    elif isinstance(v, list):
+        return [str(i).strip().rstrip("/") for i in v if str(i).strip()]
+    elif isinstance(v, str):
+        return [v.strip().rstrip("/")]
     raise ValueError(v)
 
 
@@ -73,12 +75,26 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> List[str]:
-        origins = list(self.BACKEND_CORS_ORIGINS)
-        if self.FRONTEND_URL and self.FRONTEND_URL not in origins:
-            origins.append(self.FRONTEND_URL)
-        if self.RENDER_EXTERNAL_URL and self.RENDER_EXTERNAL_URL not in origins:
-            origins.append(self.RENDER_EXTERNAL_URL)
-        # Add Vercel subdomains dynamically in cors check or explicitly add them here if static
+        origins = []
+        for origin in self.BACKEND_CORS_ORIGINS:
+            if origin and origin not in origins:
+                origins.append(origin)
+
+        for candidate in [self.FRONTEND_URL, self.BACKEND_URL, self.RENDER_EXTERNAL_URL]:
+            if not candidate:
+                continue
+            normalized = candidate.rstrip("/")
+            if normalized not in origins:
+                origins.append(normalized)
+            if normalized.startswith("http://localhost"):
+                loopback = normalized.replace("http://localhost", "http://127.0.0.1", 1)
+                if loopback not in origins:
+                    origins.append(loopback)
+            if normalized.startswith("http://127.0.0.1"):
+                loopback = normalized.replace("http://127.0.0.1", "http://localhost", 1)
+                if loopback not in origins:
+                    origins.append(loopback)
+
         return origins
 
     @property

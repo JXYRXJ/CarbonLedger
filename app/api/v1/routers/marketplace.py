@@ -88,6 +88,12 @@ def search_marketplace(
     
     data = []
     for item in items:
+        # Resolve related models for frontend mapping
+        ownership = item.ownership
+        batch = ownership.batch if ownership else None
+        project = batch.project if batch else None
+        seller = item.seller_company
+        
         data.append({
             "id": str(item.id),
             "ownership_id": str(item.ownership_id),
@@ -96,10 +102,32 @@ def search_marketplace(
             "price_per_credit": float(item.price_per_credit),
             "minimum_purchase": float(item.minimum_purchase),
             "description": item.description,
-            "status": item.status,
+            "status": item.status.value if hasattr(item.status, "value") else item.status,
             "expires_at": item.expires_at.isoformat() if item.expires_at else None,
             "created_at": item.created_at.isoformat(),
-            "updated_at": item.updated_at.isoformat()
+            "updated_at": item.updated_at.isoformat(),
+            
+            # Map camelCase fields for React frontend
+            "availableCredits": float(item.credits_for_sale),
+            "pricePerCredit": float(item.price_per_credit),
+            "verificationStandard": project.verification_standard if project else None,
+            "country": project.country if project else None,
+            
+            # Nested relations
+            "batch": {
+                "id": str(batch.id) if batch else None,
+                "batchNumber": batch.batch_number if batch else None,
+                "vintageYear": batch.vintage_year if batch else None,
+            } if batch else None,
+            "project": {
+                "id": str(project.id) if project else None,
+                "name": project.name if project else None,
+                "country": project.country if project else None,
+            } if project else None,
+            "seller": {
+                "id": str(seller.id) if seller else None,
+                "companyName": seller.name if seller else None,
+            } if seller else None,
         })
         
     res_data = {
@@ -143,22 +171,53 @@ def get_listing_detail(
     metrics_service.record_db_query()
     
     listing = service.get_listing(listing_id)
+    
+    # Resolve related models for frontend mapping
+    ownership = listing.ownership
+    batch = ownership.batch if ownership else None
+    project = batch.project if batch else None
+    seller = listing.seller_company
+    
+    data = {
+        "id": str(listing.id),
+        "ownership_id": str(listing.ownership_id),
+        "seller_company_id": str(listing.seller_company_id),
+        "credits_for_sale": float(listing.credits_for_sale),
+        "price_per_credit": float(listing.price_per_credit),
+        "minimum_purchase": float(listing.minimum_purchase),
+        "description": listing.description,
+        "status": listing.status.value if hasattr(listing.status, "value") else listing.status,
+        "expires_at": listing.expires_at.isoformat() if listing.expires_at else None,
+        "created_at": listing.created_at.isoformat(),
+        "updated_at": listing.updated_at.isoformat(),
+        
+        # Map camelCase fields for React frontend
+        "availableCredits": float(listing.credits_for_sale),
+        "pricePerCredit": float(listing.price_per_credit),
+        "verificationStandard": project.verification_standard if project else None,
+        "country": project.country if project else None,
+        
+        # Nested relations
+        "batch": {
+            "id": str(batch.id) if batch else None,
+            "batchNumber": batch.batch_number if batch else None,
+            "vintageYear": batch.vintage_year if batch else None,
+        } if batch else None,
+        "project": {
+            "id": str(project.id) if project else None,
+            "name": project.name if project else None,
+            "country": project.country if project else None,
+        } if project else None,
+        "seller": {
+            "id": str(seller.id) if seller else None,
+            "companyName": seller.name if seller else None,
+        } if seller else None,
+    }
+    
     return APIResponse(
         success=True,
         message="Listing details retrieved successfully",
-        data={
-            "id": str(listing.id),
-            "ownership_id": str(listing.ownership_id),
-            "seller_company_id": str(listing.seller_company_id),
-            "credits_for_sale": float(listing.credits_for_sale),
-            "price_per_credit": float(listing.price_per_credit),
-            "minimum_purchase": float(listing.minimum_purchase),
-            "description": listing.description,
-            "status": listing.status,
-            "expires_at": listing.expires_at.isoformat() if listing.expires_at else None,
-            "created_at": listing.created_at.isoformat(),
-            "updated_at": listing.updated_at.isoformat()
-        }
+        data=data
     )
 
 

@@ -53,15 +53,18 @@ def list_transactions(
             "order_id": str(tx.order_id),
             "buyer": {
                 "id": str(tx.buyer_company_id),
-                "name": tx.buyer_company.name if tx.buyer_company else None
+                "name": tx.buyer_company.name if tx.buyer_company else None,
+                "companyName": tx.buyer_company.name if tx.buyer_company else None,
             },
             "seller": {
                 "id": str(tx.seller_company_id),
-                "name": tx.seller_company.name if tx.seller_company else None
+                "name": tx.seller_company.name if tx.seller_company else None,
+                "companyName": tx.seller_company.name if tx.seller_company else None,
             },
             "batch": {
                 "id": str(batch.id) if batch else None,
-                "batch_number": batch.batch_number if batch else None
+                "batch_number": batch.batch_number if batch else None,
+                "batchNumber": batch.batch_number if batch else None,
             } if batch else None,
             "project": {
                 "id": str(project.id) if project else None,
@@ -77,7 +80,19 @@ def list_transactions(
             "total_price": float(tx.total_price),
             "status": tx.status,
             "completed_at": tx.completed_at.isoformat() if tx.completed_at else None,
-            "blockchain_tx_hash": tx.blockchain_tx_hash
+            "blockchain_tx_hash": tx.blockchain_tx_hash,
+            
+            # camelCase mappings for React frontend
+            "createdAt": tx.completed_at.isoformat() if tx.completed_at else None,
+            "date": tx.completed_at.isoformat() if tx.completed_at else None,
+            "buyerName": tx.buyer_company.name if tx.buyer_company else None,
+            "sellerName": tx.seller_company.name if tx.seller_company else None,
+            "batchNumber": batch.batch_number if batch else None,
+            "quantity": float(tx.credits_transferred),
+            "pricePerCredit": float(tx.price_per_credit),
+            "total": float(tx.total_price),
+            "blockchainStatus": tx.blockchain_status.lower() if hasattr(tx, "blockchain_status") else "unconfirmed",
+            "transactionHash": tx.blockchain_tx_hash,
         })
 
     return {
@@ -117,15 +132,18 @@ def get_transaction_details(
             "order_id": str(tx.order_id),
             "buyer": {
                 "id": str(tx.buyer_company_id),
-                "name": tx.buyer_company.name if tx.buyer_company else None
+                "name": tx.buyer_company.name if tx.buyer_company else None,
+                "companyName": tx.buyer_company.name if tx.buyer_company else None,
             },
             "seller": {
                 "id": str(tx.seller_company_id),
-                "name": tx.seller_company.name if tx.seller_company else None
+                "name": tx.seller_company.name if tx.seller_company else None,
+                "companyName": tx.seller_company.name if tx.seller_company else None,
             },
             "batch": {
                 "id": str(batch.id) if batch else None,
-                "batch_number": batch.batch_number if batch else None
+                "batch_number": batch.batch_number if batch else None,
+                "batchNumber": batch.batch_number if batch else None,
             } if batch else None,
             "project": {
                 "id": str(project.id) if project else None,
@@ -141,6 +159,18 @@ def get_transaction_details(
             "total_price": float(tx.total_price),
             "status": tx.status,
             "completed_at": tx.completed_at.isoformat() if tx.completed_at else None,
-            "blockchain_tx_hash": tx.blockchain_tx_hash
+            "blockchain_tx_hash": tx.blockchain_tx_hash,
+            
+            # camelCase mappings for React frontend
+            "createdAt": tx.completed_at.isoformat() if tx.completed_at else None,
+            "date": tx.completed_at.isoformat() if tx.completed_at else None,
+            "buyerName": tx.buyer_company.name if tx.buyer_company else None,
+            "sellerName": tx.seller_company.name if tx.seller_company else None,
+            "batchNumber": batch.batch_number if batch else None,
+            "quantity": float(tx.credits_transferred),
+            "pricePerCredit": float(tx.price_per_credit),
+            "total": float(tx.total_price),
+            "blockchainStatus": tx.blockchain_status.lower() if hasattr(tx, "blockchain_status") else "unconfirmed",
+            "transactionHash": tx.blockchain_tx_hash,
         }
     }

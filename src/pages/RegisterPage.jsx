@@ -12,10 +12,17 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext.jsx";
 
 const schema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
   companyName: z.string().min(2, "Company name is required"),
+  registrationNumber: z.string().min(2, "Registration number is required"),
+  country: z.string().min(2, "Country is required"),
   email: z.string().email("Enter a valid email"),
   password: z.string().min(8, "Use at least 8 characters"),
   confirmPassword: z.string(),
+  industry: z.string().max(80).optional().or(z.literal("")),
+  website: z.string().url("Enter a valid URL").optional().or(z.literal("")),
+  walletAddress: z.string().max(255).optional().or(z.literal("")),
 }).refine((d) => d.password === d.confirmPassword, {
   path: ["confirmPassword"], message: "Passwords don't match",
 });
@@ -30,9 +37,16 @@ export default function RegisterPage() {
   const onSubmit = async (values) => {
     try {
       await registerUser({
-        companyName: values.companyName,
+        first_name: values.firstName,
+        last_name: values.lastName,
+        company_name: values.companyName,
+        registration_number: values.registrationNumber,
+        country: values.country,
         email: values.email,
         password: values.password,
+        industry: values.industry?.trim() || undefined,
+        website: values.website?.trim() || undefined,
+        wallet_address: values.walletAddress?.trim() || undefined,
       });
       toast.success("Account created");
       navigate("/dashboard", { replace: true });
@@ -48,10 +62,49 @@ export default function RegisterPage() {
         <p className="mt-2 text-sm text-muted-foreground">Get started with CarbonLedger in minutes.</p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First name</Label>
+              <Input id="firstName" placeholder="Jane" {...register("firstName")} />
+              {errors.firstName && <p className="text-xs text-[color:var(--danger)]">{errors.firstName.message}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last name</Label>
+              <Input id="lastName" placeholder="Doe" {...register("lastName")} />
+              {errors.lastName && <p className="text-xs text-[color:var(--danger)]">{errors.lastName.message}</p>}
+            </div>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="companyName">Company name</Label>
             <Input id="companyName" placeholder="Acme Corp" {...register("companyName")} />
             {errors.companyName && <p className="text-xs text-[color:var(--danger)]">{errors.companyName.message}</p>}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="registrationNumber">Registration number</Label>
+              <Input id="registrationNumber" placeholder="CO-1234567-X" {...register("registrationNumber")} />
+              {errors.registrationNumber && <p className="text-xs text-[color:var(--danger)]">{errors.registrationNumber.message}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="country">Country</Label>
+              <Input id="country" placeholder="United States" {...register("country")} />
+              {errors.country && <p className="text-xs text-[color:var(--danger)]">{errors.country.message}</p>}
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="industry">Industry</Label>
+              <Input id="industry" placeholder="Technology" {...register("industry")} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="website">Website</Label>
+              <Input id="website" placeholder="https://acme.com" {...register("website")} />
+              {errors.website && <p className="text-xs text-[color:var(--danger)]">{errors.website.message}</p>}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="walletAddress">Wallet address (optional)</Label>
+            <Input id="walletAddress" placeholder="0x71C..." {...register("walletAddress")} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Work email</Label>

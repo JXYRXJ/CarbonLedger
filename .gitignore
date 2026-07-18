@@ -64,4 +64,5 @@ blockchain/coverage.json
 # Lovable
 .lovable/
 
-
+# Temporary scratch folder
+scratch/

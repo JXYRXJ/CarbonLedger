@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,10 +17,14 @@ import { useWallet, useConnectWallet, useDisconnectWallet } from "@/hooks/useWal
 import { toast } from "sonner";
 
 const profileSchema = z.object({
-  companyName: z.string().min(1, "Required").max(120),
+  firstName: z.string().min(1, "Required").max(80),
+  lastName: z.string().min(1, "Required").max(80),
   email: z.string().email(),
+  companyName: z.string().max(120).optional().or(z.literal("")),
   industry: z.string().max(80).optional().or(z.literal("")),
+  country: z.string().max(80).optional().or(z.literal("")),
   website: z.string().url("Invalid URL").optional().or(z.literal("")),
+  emailDomain: z.string().max(80).optional().or(z.literal("")),
 });
 
 const passwordSchema = z.object({
@@ -31,20 +36,54 @@ const passwordSchema = z.object({
 function ProfileForm() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["settings-profile"], queryFn: settingsApi.getProfile });
-  const form = useForm({ resolver: zodResolver(profileSchema), defaultValues: { companyName: "", email: "", industry: "", website: "" } });
-  useEffect(() => { if (q.data) form.reset({ companyName: q.data.companyName || "", email: q.data.email || "", industry: q.data.industry || "", website: q.data.website || "" }); }, [q.data]); // eslint-disable-line
+  const form = useForm({ resolver: zodResolver(profileSchema), defaultValues: { firstName: "", lastName: "", email: "", companyName: "", industry: "", country: "", website: "", emailDomain: "" } });
+  useEffect(() => {
+    if (q.data) {
+      form.reset({
+        firstName: q.data?.user?.first_name || "",
+        lastName: q.data?.user?.last_name || "",
+        email: q.data?.user?.email || "",
+        companyName: q.data?.company?.name || "",
+        industry: q.data?.company?.industry || "",
+        country: q.data?.company?.country || "",
+        website: q.data?.company?.website || "",
+        emailDomain: q.data?.company?.email_domain || "",
+      });
+    }
+  }, [q.data]); // eslint-disable-line
   const save = useMutation({
-    mutationFn: settingsApi.updateProfile,
+    mutationFn: async (values) => {
+      await settingsApi.updateProfile({ first_name: values.firstName, last_name: values.lastName, email: values.email });
+      const companyPayload = {
+        name: values.companyName || undefined,
+        industry: values.industry || undefined,
+        country: values.country || undefined,
+        website: values.website || undefined,
+        email_domain: values.emailDomain || undefined,
+      };
+      if (Object.values(companyPayload).some(Boolean)) {
+        await settingsApi.updateCompany(companyPayload);
+      }
+      return values;
+    },
     onSuccess: () => { toast.success("Profile updated"); qc.invalidateQueries({ queryKey: ["settings-profile"] }); },
     onError: (e) => toast.error(e?.response?.data?.detail || "Failed"),
   });
   return (
     <Card className="max-w-2xl p-6">
       <form className="space-y-4" onSubmit={form.handleSubmit((v) => save.mutate(v))}>
-        <div className="space-y-1.5"><Label>Company name</Label><Input {...form.register("companyName")} />{form.formState.errors.companyName && <p className="text-xs text-destructive">{form.formState.errors.companyName.message}</p>}</div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5"><Label>First name</Label><Input {...form.register("firstName")} />{form.formState.errors.firstName && <p className="text-xs text-destructive">{form.formState.errors.firstName.message}</p>}</div>
+          <div className="space-y-1.5"><Label>Last name</Label><Input {...form.register("lastName")} />{form.formState.errors.lastName && <p className="text-xs text-destructive">{form.formState.errors.lastName.message}</p>}</div>
+        </div>
         <div className="space-y-1.5"><Label>Email</Label><Input type="email" {...form.register("email")} />{form.formState.errors.email && <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>}</div>
+        <div className="space-y-1.5"><Label>Company name</Label><Input {...form.register("companyName")} />{form.formState.errors.companyName && <p className="text-xs text-destructive">{form.formState.errors.companyName.message}</p>}</div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5"><Label>Industry</Label><Input {...form.register("industry")} /></div>
+          <div className="space-y-1.5"><Label>Email domain</Label><Input {...form.register("emailDomain")} /></div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5"><Label>Country</Label><Input {...form.register("country")} /></div>
           <div className="space-y-1.5"><Label>Website</Label><Input {...form.register("website")} />{form.formState.errors.website && <p className="text-xs text-destructive">{form.formState.errors.website.message}</p>}</div>
         </div>
         <div className="flex justify-end"><Button type="submit" disabled={save.isPending}>Save changes</Button></div>
@@ -56,7 +95,7 @@ function ProfileForm() {
 function PasswordForm() {
   const form = useForm({ resolver: zodResolver(passwordSchema), defaultValues: { currentPassword: "", newPassword: "", confirm: "" } });
   const save = useMutation({
-    mutationFn: settingsApi.changePassword,
+    mutationFn: (values) => settingsApi.changePassword({ old_password: values.currentPassword, new_password: values.newPassword }),
     onSuccess: () => { toast.success("Password updated"); form.reset(); },
     onError: (e) => toast.error(e?.response?.data?.detail || "Failed"),
   });
@@ -144,10 +183,13 @@ function SecurityPanel() {
 }
 
 export default function SettingsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get("tab") || "profile";
+
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" description="Manage your company profile, notifications, and security." />
-      <Tabs defaultValue="profile">
+      <Tabs value={tab} onValueChange={(val) => setSearchParams({ tab: val })}>
         <TabsList className="flex-wrap">
           <TabsTrigger value="profile">Company Profile</TabsTrigger>
           <TabsTrigger value="password">Password</TabsTrigger>

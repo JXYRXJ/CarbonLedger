@@ -30,7 +30,7 @@ def parse_date(date_str: Optional[str]) -> Optional[datetime]:
 
 @router.get("/transactions")
 def export_transactions(
-    format: str = Query("csv", regex="^(csv|excel|pdf)$"),
+    format: str = Query("csv", pattern="^(csv|excel|pdf)$"),
     company_id: Optional[uuid.UUID] = Query(None),
     status: Optional[str] = Query(None),
     start_date: Optional[str] = Query(None),
@@ -132,7 +132,7 @@ def export_transactions(
 
 @router.get("/portfolio")
 def export_portfolio(
-    format: str = Query("csv", regex="^(csv|excel|pdf)$"),
+    format: str = Query("csv", pattern="^(csv|excel|pdf)$"),
     company_id: Optional[uuid.UUID] = Query(None),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
@@ -211,7 +211,7 @@ def export_portfolio(
 
 @router.get("/retirements")
 def export_retirements(
-    format: str = Query("csv", regex="^(csv|excel|pdf)$"),
+    format: str = Query("csv", pattern="^(csv|excel|pdf)$"),
     company_id: Optional[uuid.UUID] = Query(None),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -295,7 +295,7 @@ def export_retirements(
 
 @router.get("/audit-logs")
 def export_audit_logs(
-    format: str = Query("csv", regex="^(csv|excel|pdf)$"),
+    format: str = Query("csv", pattern="^(csv|excel|pdf)$"),
     user_id: Optional[uuid.UUID] = Query(None),
     action: Optional[str] = Query(None),
     start_date: Optional[str] = Query(None),

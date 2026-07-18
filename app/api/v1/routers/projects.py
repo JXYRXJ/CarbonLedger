@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Any
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
 
@@ -41,12 +41,12 @@ class UpdateDocumentRequest(BaseModel):
 # CARBON PROJECT ENDPOINTS
 # ==============================================================================
 
-@router.get("", response_model=APIResponse[PaginatedResponse[CarbonProjectResponse]])
+@router.get("", response_model=APIResponse[PaginatedResponse[Any]])
 def list_projects(
     pagination: PaginationParams = Depends(get_pagination_params),
     current_user: User = Depends(get_current_active_user),
     project_service: ProjectService = Depends(get_service(ProjectService, ProjectRepository))
-) -> APIResponse[PaginatedResponse[CarbonProjectResponse]]:
+):
     """
     Retrieves a paginated and filtered list of carbon projects registered on the platform.
     Accessible to all authenticated users.
@@ -74,9 +74,38 @@ def list_projects(
         order=pagination.order
     )
     
+    items_data = []
+    for p in projects:
+        registry = p.registry
+        items_data.append({
+            "id": str(p.id),
+            "registry_id": str(p.registry_id),
+            "project_code": p.project_code,
+            "name": p.name,
+            "country": p.country,
+            "project_type": p.project_type,
+            "verification_standard": p.verification_standard,
+            "methodology": p.methodology,
+            "description": p.description,
+            "developer": p.developer,
+            "start_date": p.start_date.isoformat() if p.start_date else None,
+            "end_date": p.end_date.isoformat() if p.end_date else None,
+            
+            # camelCase mappings for React frontend
+            "projectType": p.project_type,
+            "verificationStandard": p.verification_standard,
+            "registryName": registry.name if registry else None,
+            
+            # Nested relations
+            "registry": {
+                "id": str(registry.id) if registry else None,
+                "name": registry.name if registry else None,
+            } if registry else None,
+        })
+    
     pages = (total + pagination.limit - 1) // pagination.limit if pagination.limit > 0 else 0
     paginated_data = PaginatedResponse(
-        items=[CarbonProjectResponse.model_validate(p) for p in projects],
+        items=items_data,
         pagination=PaginationMetadata(
             total=total,
             page=pagination.page,
@@ -128,10 +157,53 @@ def get_project_details(
     documents = document_service.list_project_documents(project_id)
     stats = project_service.get_project_statistics(project_id)
 
+    docs_data = []
+    for doc in documents:
+        docs_data.append({
+            "id": str(doc.id),
+            "documentType": doc.document_type.value if hasattr(doc.document_type, "value") else str(doc.document_type),
+            "fileName": doc.file_name,
+            "fileUrl": doc.file_url,
+            "uploadedAt": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+        })
+
     data = {
+        # Raw model details (flat)
+        "id": str(project.id),
+        "registry_id": str(project.registry_id),
+        "project_code": project.project_code,
+        "name": project.name,
+        "country": project.country,
+        "project_type": project.project_type,
+        "verification_standard": project.verification_standard,
+        "methodology": project.methodology,
+        "description": project.description,
+        "developer": project.developer,
+        "start_date": project.start_date.isoformat() if project.start_date else None,
+        "end_date": project.end_date.isoformat() if project.end_date else None,
+        
+        # camelCase mappings for React frontend
+        "projectType": project.project_type,
+        "verificationStandard": project.verification_standard,
+        "registryName": registry.name if registry else None,
+        "vintageYears": [str(v) for v in range(project.start_date.year, project.end_date.year + 1)] if (project.start_date and project.end_date) else [],
+        
+        # Nested relations
+        "registry": {
+            "id": str(registry.id) if registry else None,
+            "name": registry.name if registry else None,
+        } if registry else None,
+        
+        "documents": docs_data,
+        
+        "stats": {
+            "total_credits": float(stats["credits_issued"]),
+            "remaining_credits": float(stats["credits_remaining"]),
+            "batches_count": int(stats["batches_count"]),
+        },
+        
+        # Original keys
         "project": CarbonProjectResponse.model_validate(project).model_dump(),
-        "registry": RegistryResponse.model_validate(registry).model_dump(),
-        "documents": [ProjectDocumentResponse.model_validate(d).model_dump() for d in documents],
         "statistics": stats,
         "associated_credit_batch_count": stats["batches_count"]
     }

@@ -122,6 +122,9 @@ def list_retirements(
 
     data = []
     for ret in sliced:
+        ownership = ret.ownership
+        batch = ownership.batch if ownership else None
+        
         data.append({
             "id": str(ret.id),
             "ownership_id": str(ret.ownership_id),
@@ -131,7 +134,20 @@ def list_retirements(
             "reason": ret.reason,
             "certificate_number": ret.certificate_number,
             "blockchain_tx_hash": ret.blockchain_tx_hash,
-            "retired_at": ret.retired_at.isoformat()
+            "retired_at": ret.retired_at.isoformat(),
+            
+            # camelCase mappings for React frontend
+            "batchNumber": batch.batch_number if batch else None,
+            "quantity": float(ret.credits_retired),
+            "createdAt": ret.retired_at.isoformat() if ret.retired_at else None,
+            "date": ret.retired_at.isoformat() if ret.retired_at else None,
+            "transactionHash": ret.blockchain_tx_hash,
+            
+            # Nested relations
+            "batch": {
+                "id": str(batch.id) if batch else None,
+                "batchNumber": batch.batch_number if batch else None,
+            } if batch else None,
         })
 
     return APIResponse(
@@ -142,6 +158,38 @@ def list_retirements(
             "total": total,
             "page": pagination.page,
             "limit": pagination.limit
+        }
+    )
+
+
+@router.get("/stats", response_model=APIResponse[dict])
+def get_retirement_stats(
+    current_user: User = Depends(get_current_active_user),
+    service: RetirementService = Depends(get_retirement_service)
+):
+    """
+    Retrieves aggregated retirement statistics (total tons, total book value, certificate count).
+    """
+    if not current_user.company_id:
+        raise BusinessRuleException("User must belong to a company to retrieve stats")
+        
+    retirements = service.list_retirements(company_id=current_user.company_id)
+    
+    total_retired = 0.0
+    retired_value = 0.0
+    
+    for r in retirements:
+        total_retired += float(r.credits_retired)
+        avg_price = float(r.ownership.average_purchase_price or 0.0) if r.ownership else 0.0
+        retired_value += float(r.credits_retired) * avg_price
+        
+    return APIResponse(
+        success=True,
+        message="Retirement stats calculated successfully",
+        data={
+            "totalRetired": total_retired,
+            "retiredValue": retired_value,
+            "certificates": len(retirements)
         }
     )
 
@@ -160,6 +208,9 @@ def get_retirement_detail(
         if ret.company_id != current_user.company_id:
             raise PermissionDeniedException("You do not have permission to view this retirement")
 
+    ownership = ret.ownership
+    batch = ownership.batch if ownership else None
+
     return APIResponse(
         success=True,
         message="Retirement details retrieved successfully",
@@ -172,7 +223,20 @@ def get_retirement_detail(
             "reason": ret.reason,
             "certificate_number": ret.certificate_number,
             "blockchain_tx_hash": ret.blockchain_tx_hash,
-            "retired_at": ret.retired_at.isoformat()
+            "retired_at": ret.retired_at.isoformat(),
+            
+            # camelCase mappings for React frontend
+            "batchNumber": batch.batch_number if batch else None,
+            "quantity": float(ret.credits_retired),
+            "createdAt": ret.retired_at.isoformat() if ret.retired_at else None,
+            "date": ret.retired_at.isoformat() if ret.retired_at else None,
+            "transactionHash": ret.blockchain_tx_hash,
+            
+            # Nested relations
+            "batch": {
+                "id": str(batch.id) if batch else None,
+                "batchNumber": batch.batch_number if batch else None,
+            } if batch else None,
         }
     )
 

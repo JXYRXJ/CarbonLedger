@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { listingApi } from "@/services/listingApi.js";
 import { usePortfolio } from "@/hooks/usePortfolio.js";
@@ -18,18 +18,22 @@ const schema = z.object({
   ownershipId: z.string().min(1, "Select a holding"),
   creditsToSell: z.coerce.number().int().positive("Must be positive"),
   pricePerCredit: z.coerce.number().positive("Must be positive"),
+  minimumPurchase: z.coerce.number().min(1, "Must be at least 1").optional().or(z.literal("")),
+  expiresAt: z.string().optional().or(z.literal("")),
   description: z.string().max(1000).optional().or(z.literal("")),
 });
 
 export default function CreateListingPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const holdingParam = searchParams.get("holding") || "";
   const qc = useQueryClient();
   const portfolioQ = usePortfolio();
   const items = Array.isArray(portfolioQ.data) ? portfolioQ.data : portfolioQ.data?.items || [];
 
   const form = useForm({
     resolver: zodResolver(schema),
-    defaultValues: { ownershipId: "", creditsToSell: 1, pricePerCredit: 1, description: "" },
+    defaultValues: { ownershipId: holdingParam, creditsToSell: 1, pricePerCredit: 1, minimumPurchase: 1, expiresAt: "", description: "" },
   });
 
   const create = useMutation({
@@ -43,7 +47,18 @@ export default function CreateListingPage() {
     onError: (e) => toast.error(e?.response?.data?.detail || "Failed to create listing"),
   });
 
-  const onSubmit = (values) => create.mutate(values);
+  const onSubmit = (values) => {
+    const payload = {
+      ownership_id: values.ownershipId,
+      credits_for_sale: Number(values.creditsToSell),
+      price_per_credit: Number(values.pricePerCredit),
+      minimum_purchase: values.minimumPurchase ? Number(values.minimumPurchase) : 1,
+      description: values.description?.trim() ? values.description.trim() : null,
+      expires_at: values.expiresAt ? new Date(values.expiresAt).toISOString() : null,
+    };
+
+    create.mutate(payload);
+  };
 
   return (
     <div className="space-y-6">
@@ -74,6 +89,18 @@ export default function CreateListingPage() {
               <Label>Price per credit (USD)</Label>
               <Input type="number" step="0.01" min={0.01} {...form.register("pricePerCredit")} />
               {form.formState.errors.pricePerCredit && <p className="text-xs text-destructive">{form.formState.errors.pricePerCredit.message}</p>}
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Minimum purchase</Label>
+              <Input type="number" step="0.01" min={1} {...form.register("minimumPurchase")} />
+              {form.formState.errors.minimumPurchase && <p className="text-xs text-destructive">{form.formState.errors.minimumPurchase.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Expires at (optional)</Label>
+              <Input type="datetime-local" {...form.register("expiresAt")} />
+              {form.formState.errors.expiresAt && <p className="text-xs text-destructive">{form.formState.errors.expiresAt.message}</p>}
             </div>
           </div>
           <div className="space-y-1.5">

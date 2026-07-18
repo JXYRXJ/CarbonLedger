@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional
+from typing import Optional, Any
 from fastapi import APIRouter, Depends, status
 
 from app.core.dependencies import get_current_admin, get_current_active_user, get_pagination_params, get_service
@@ -15,12 +15,12 @@ from app.services.metrics import metrics_service
 router = APIRouter(prefix="/registries", tags=["Registries"])
 
 
-@router.get("", response_model=APIResponse[PaginatedResponse[RegistryResponse]])
+@router.get("", response_model=APIResponse[PaginatedResponse[Any]])
 def list_registries(
     pagination: PaginationParams = Depends(get_pagination_params),
     current_user: User = Depends(get_current_active_user),
     registry_service: RegistryService = Depends(get_service(RegistryService, RegistryRepository))
-) -> APIResponse[PaginatedResponse[RegistryResponse]]:
+):
     """
     Retrieves a paginated, sorted, and filtered list of supported carbon standard registries.
     Accessible to all authenticated users.
@@ -49,9 +49,26 @@ def list_registries(
         order=pagination.order
     )
     
+    items_data = []
+    for r in registries:
+        items_data.append({
+            "id": str(r.id),
+            "name": r.name,
+            "country": r.country,
+            "website": r.website,
+            "accreditation": r.accreditation,
+            "description": r.description,
+            "status": r.status,
+            "created_at": r.created_at.isoformat(),
+            "updated_at": r.updated_at.isoformat(),
+            
+            # camelCase mappings
+            "projectsCount": len(r.projects) if r.projects else 0,
+        })
+    
     pages = (total + pagination.limit - 1) // pagination.limit if pagination.limit > 0 else 0
     paginated_data = PaginatedResponse(
-        items=[RegistryResponse.model_validate(r) for r in registries],
+        items=items_data,
         pagination=PaginationMetadata(
             total=total,
             page=pagination.page,
@@ -70,12 +87,12 @@ def list_registries(
     )
 
 
-@router.get("/{registry_id}", response_model=APIResponse[RegistryResponse])
+@router.get("/{registry_id}", response_model=APIResponse[dict])
 def get_registry(
     registry_id: uuid.UUID,
     current_user: User = Depends(get_current_active_user),
     registry_service: RegistryService = Depends(get_service(RegistryService, RegistryRepository))
-) -> APIResponse[RegistryResponse]:
+) -> APIResponse[dict]:
     """
     Retrieves information on a specific registry by its unique UUID.
     Accessible to all authenticated users.
@@ -86,20 +103,69 @@ def get_registry(
         metrics_service.record_cache_hit()
         return APIResponse(
             message="Registry details retrieved successfully (cached)",
-            data=RegistryResponse.model_validate(cached)
+            data=cached
         )
 
     metrics_service.record_cache_miss()
     metrics_service.record_db_query()
     
     registry = registry_service.get_registry(registry_id)
-    resp_data = RegistryResponse.model_validate(registry)
+    stats = registry_service.get_registry_statistics(registry_id)
     
-    cache_service.set(cache_key, resp_data.model_dump(), ttl=300)
+    projects_data = []
+    for p in registry.projects:
+        if p.deleted_at is None:
+            projects_data.append({
+                "id": str(p.id),
+                "registry_id": str(p.registry_id),
+                "project_code": p.project_code,
+                "name": p.name,
+                "country": p.country,
+                "project_type": p.project_type,
+                "verification_standard": p.verification_standard,
+                "methodology": p.methodology,
+                "description": p.description,
+                "developer": p.developer,
+                "start_date": p.start_date.isoformat() if p.start_date else None,
+                "end_date": p.end_date.isoformat() if p.end_date else None,
+                
+                # camelCase
+                "projectType": p.project_type,
+                "verificationStandard": p.verification_standard,
+                "registryName": registry.name,
+            })
+
+    data = {
+        "id": str(registry.id),
+        "name": registry.name,
+        "country": registry.country,
+        "website": registry.website,
+        "accreditation": registry.accreditation,
+        "description": registry.description,
+        "status": registry.status,
+        "created_at": registry.created_at.isoformat(),
+        "updated_at": registry.updated_at.isoformat(),
+        
+        # camelCase
+        "projectsCount": stats["projects_count"],
+        
+        # Nested relations
+        "projects": projects_data,
+        
+        # Detailed stats block
+        "stats": {
+            "total_credits_issued": float(stats["total_credits_issued"]),
+            "batches_count": int(stats["batches_count"]),
+            "active_projects": int(stats["active_projects"]),
+            "inactive_projects": int(stats["inactive_projects"]),
+        }
+    }
+    
+    cache_service.set(cache_key, data, ttl=300)
     
     return APIResponse(
         message="Registry details retrieved successfully",
-        data=resp_data
+        data=data
     )
 
 

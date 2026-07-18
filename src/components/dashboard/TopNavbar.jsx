@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { Bell, Menu, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -8,6 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext.jsx";
 
 export default function TopNavbar({ onOpenMobile }) {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const initials = (user?.companyName || user?.email || "C L")
     .split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
@@ -26,7 +28,11 @@ export default function TopNavbar({ onOpenMobile }) {
         <Input placeholder="Search registry, assets, orders…" className="pl-9" />
       </div>
       <div className="ml-auto flex items-center gap-2">
-        <button className="relative grid h-9 w-9 place-items-center rounded-md border border-border hover:bg-muted" aria-label="Notifications">
+        <button
+          onClick={() => navigate("/settings?tab=notifications")}
+          className="relative grid h-9 w-9 place-items-center rounded-md border border-border hover:bg-muted"
+          aria-label="Notifications"
+        >
           <Bell className="h-4 w-4" />
           <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[color:var(--accent)]" />
         </button>
@@ -45,8 +51,8 @@ export default function TopNavbar({ onOpenMobile }) {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/settings?tab=profile")}>Profile</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/settings?tab=notifications")}>Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={logout}>Log out</DropdownMenuItem>
           </DropdownMenuContent>

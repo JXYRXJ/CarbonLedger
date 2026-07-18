@@ -1362,7 +1362,7 @@ class PortfolioService:
         batches = self.get_owned_batches(company_id)
         
         self.audit_service.record_event(
-            company_id, None, "Portfolio", company_id, "PORTFOLIO_VIEWED",
+            None, company_id, "Portfolio", company_id, "PORTFOLIO_VIEWED",
             new_values={"owned_credit_count": stats["owned_credit_count"]}
         )
         

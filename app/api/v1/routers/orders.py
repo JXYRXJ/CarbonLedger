@@ -92,6 +92,10 @@ def list_orders(
 
     data = []
     for order in orders:
+        listing = order.listing
+        buyer = order.buyer_company
+        batch = listing.ownership.batch if (listing and listing.ownership) else None
+        
         data.append({
             "id": str(order.id),
             "listing_id": str(order.listing_id),
@@ -99,10 +103,29 @@ def list_orders(
             "requested_credits": float(order.requested_credits),
             "price_per_credit": float(order.price_per_credit),
             "total_price": float(order.total_price),
-            "status": order.status,
+            "status": order.status.value if hasattr(order.status, "value") else order.status,
             "payment_reference": order.payment_reference,
             "created_at": order.created_at.isoformat(),
-            "updated_at": order.updated_at.isoformat()
+            "updated_at": order.updated_at.isoformat(),
+            
+            # camelCase mappings for React frontend
+            "listingId": str(order.listing_id),
+            "buyerCompanyId": str(order.buyer_company_id),
+            "quantity": float(order.requested_credits),
+            "pricePerCredit": float(order.price_per_credit),
+            "total": float(order.total_price),
+            "createdAt": order.created_at.isoformat(),
+            "buyerName": buyer.name if buyer else None,
+            
+            # Nested relations
+            "listing": {
+                "id": str(listing.id) if listing else None,
+                "batchNumber": batch.batch_number if batch else None,
+            } if listing else None,
+            "buyer": {
+                "id": str(buyer.id) if buyer else None,
+                "companyName": buyer.name if buyer else None,
+            } if buyer else None,
         })
 
     return APIResponse(
@@ -128,6 +151,10 @@ def get_order_details(
         if order.buyer_company_id != current_user.company_id:
             raise PermissionDeniedException("You do not have permission to view this order")
 
+    listing = order.listing
+    buyer = order.buyer_company
+    batch = listing.ownership.batch if (listing and listing.ownership) else None
+
     return APIResponse(
         success=True,
         message="Order details retrieved successfully",
@@ -138,10 +165,29 @@ def get_order_details(
             "requested_credits": float(order.requested_credits),
             "price_per_credit": float(order.price_per_credit),
             "total_price": float(order.total_price),
-            "status": order.status,
+            "status": order.status.value if hasattr(order.status, "value") else order.status,
             "payment_reference": order.payment_reference,
             "created_at": order.created_at.isoformat(),
-            "updated_at": order.updated_at.isoformat()
+            "updated_at": order.updated_at.isoformat(),
+            
+            # camelCase mappings for React frontend
+            "listingId": str(order.listing_id),
+            "buyerCompanyId": str(order.buyer_company_id),
+            "quantity": float(order.requested_credits),
+            "pricePerCredit": float(order.price_per_credit),
+            "total": float(order.total_price),
+            "createdAt": order.created_at.isoformat(),
+            "buyerName": buyer.name if buyer else None,
+            
+            # Nested relations
+            "listing": {
+                "id": str(listing.id) if listing else None,
+                "batchNumber": batch.batch_number if batch else None,
+            } if listing else None,
+            "buyer": {
+                "id": str(buyer.id) if buyer else None,
+                "companyName": buyer.name if buyer else None,
+            } if buyer else None,
         }
     )
 

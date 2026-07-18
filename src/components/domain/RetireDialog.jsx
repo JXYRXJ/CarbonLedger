@@ -23,7 +23,12 @@ export default function RetireDialog({ holding, open, onOpenChange }) {
     if (qty < 1 || qty > available) { toast.error("Invalid quantity"); return; }
     if (!reason.trim()) { toast.error("Reason is required"); return; }
     try {
-      await retire.mutateAsync({ batchId: holding.batch?.id || holding.batchId, quantity: Number(qty), reason: reason.trim() });
+      await retire.mutateAsync({
+        ownership_id: holding.ownership_id || holding.ownershipId || holding.id || holding.batch?.id,
+        quantity: Number(qty),
+        beneficiary_name: "CarbonLedger",
+        retirement_reason: reason.trim(),
+      });
       toast.success("Retirement submitted");
       onOpenChange(false);
     } catch (e) {

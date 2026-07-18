@@ -25,7 +25,7 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const data = await authApi.login(creds);
-      persist(data.token, data.refreshToken, data.user);
+      persist(data.access_token, data.refresh_token, data.user);
       return data.user;
     } finally {
       setLoading(false);
@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const data = await authApi.register(payload);
-      persist(data.token, data.refreshToken, data.user);
+      persist(data.access_token, data.refresh_token, data.user);
       return data.user;
     } finally {
       setLoading(false);
@@ -44,7 +44,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
-    try { await authApi.logout(); } catch { /* ignore */ }
+    try {
+      const refreshToken = localStorage.getItem("cl_refresh");
+      await authApi.logout({ refresh_token: refreshToken });
+    } catch { /* ignore */ }
     localStorage.removeItem("cl_token");
     localStorage.removeItem("cl_refresh");
     localStorage.removeItem("cl_user");

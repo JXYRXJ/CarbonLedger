@@ -21,7 +21,7 @@ export default function PurchaseDialog({ listing, open, onOpenChange }) {
     if (!listing) return;
     if (qty < 1 || qty > available) { toast.error("Invalid quantity"); return; }
     try {
-      await buy.mutateAsync({ listingId: listing.id, quantity: Number(qty) });
+      await buy.mutateAsync({ listing_id: listing.id, requested_credits: Number(qty) });
       toast.success("Purchase submitted");
       onOpenChange(false);
     } catch (e) {

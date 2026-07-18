@@ -46,6 +46,29 @@ def get_portfolio_statistics(
     )
 
 
+@router.get("/summary", response_model=APIResponse[dict])
+def get_portfolio_summary(
+    company: Company = Depends(get_current_company),
+    current_user: User = Depends(get_current_active_user),
+    portfolio_service: PortfolioService = Depends(get_service(PortfolioService))
+) -> APIResponse[dict]:
+    """
+    Retrieves aggregated portfolio summary stats mapped with camelCase keys for the React frontend.
+    """
+    stats = portfolio_service.get_statistics(company.id)
+    data = {
+        "portfolioValue": stats["estimated_portfolio_value"],
+        "ownedCredits": stats["owned_credit_count"],
+        "availableCredits": stats["available_credit_count"],
+        "listedCredits": stats["listed_credit_count"],
+        "retiredCredits": stats["retired_credit_count"],
+    }
+    return APIResponse(
+        message="Portfolio summary retrieved successfully",
+        data=data
+    )
+
+
 @router.get("/batches", response_model=APIResponse[list])
 def get_portfolio_batches(
     company: Company = Depends(get_current_company),

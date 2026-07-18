@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext.jsx";
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/registry", label: "Registry", icon: Database },
+  { to: "/registries", label: "Registry", icon: Database },
   { to: "/assets", label: "Assets", icon: Layers },
   { to: "/marketplace", label: "Marketplace", icon: ShoppingBag },
   { to: "/portfolio", label: "Portfolio", icon: Briefcase },
