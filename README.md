@@ -234,4 +234,4 @@ Interfaces defined in [blockchain.py](file:///d:/CarbonLedger/carbon-ledger-hub-
 1. **Ownership Minting**: Trigger `register_ownership()` inside `BatchService.create_batch()`.
 2. **Atomic Trade Verification**: Execute `transfer_ownership()` on-chain inside `OrderService.create_order()` database transaction boundary.
 3. **Retirement Burning**: Record the permanent credit lock on-chain inside `RetirementService.retire_credits()` via `record_retirement()`.
-4. **Log Anchorage**: Anchors cryptographic audit log checksums to the chain using `record_audit_log()` inside `AuditService`.
+4. **Log Anchorage**: Anchors cryptographic audit log checksums to the chain using `record_audit_log()` inside `AuditService`.....
