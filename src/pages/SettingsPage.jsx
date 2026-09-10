@@ -23,15 +23,44 @@ const profileSchema = z.object({
   companyName: z.string().max(120).optional().or(z.literal("")),
   industry: z.string().max(80).optional().or(z.literal("")),
   country: z.string().max(80).optional().or(z.literal("")),
-  website: z.string().url("Invalid URL").optional().or(z.literal("")),
+  website: z.string().optional().refine((val) => {
+    if (!val || !val.trim()) return true;
+    try {
+      const urlToTest = /^https?:\/\//i.test(val.trim()) ? val.trim() : `https://${val.trim()}`;
+      new URL(urlToTest);
+      return true;
+    } catch {
+      return false;
+    }
+  }, "Enter a valid website (e.g. acme.com)"),
   emailDomain: z.string().max(80).optional().or(z.literal("")),
 });
 
 const passwordSchema = z.object({
   currentPassword: z.string().min(8, "Min 8 characters"),
-  newPassword: z.string().min(8, "Min 8 characters").max(128),
+  newPassword: z.string()
+    .min(8, "Password must be at least 8 characters long")
+    .regex(/[A-Z]/, "Must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Must contain at least one number")
+    .regex(/[!@#$%^&*(),.?":{}|<>]/, "Must contain at least one special character")
+    .max(128),
   confirm: z.string().min(8),
 }).refine((d) => d.newPassword === d.confirm, { path: ["confirm"], message: "Passwords don't match" });
+
+const getApiErrorMessage = (e, fallback = "Operation failed") => {
+  const data = e?.response?.data;
+  if (!data) return e?.message || fallback;
+  if (Array.isArray(data.errors) && data.errors.length > 0) {
+    const detailList = data.errors.map((err) => {
+      if (typeof err === "string") return err;
+      if (err?.message) return `${err.field ? `${err.field}: ` : ""}${err.message}`;
+      return JSON.stringify(err);
+    }).join(". ");
+    return `${data.message ? `${data.message}: ` : ""}${detailList}`;
+  }
+  return data.message || data.detail || fallback;
+};
 
 function ProfileForm() {
   const qc = useQueryClient();
@@ -54,11 +83,14 @@ function ProfileForm() {
   const save = useMutation({
     mutationFn: async (values) => {
       await settingsApi.updateProfile({ first_name: values.firstName, last_name: values.lastName, email: values.email });
+      const cleanWebsite = values.website?.trim()
+        ? (/^https?:\/\//i.test(values.website.trim()) ? values.website.trim() : `https://${values.website.trim()}`)
+        : undefined;
       const companyPayload = {
         name: values.companyName || undefined,
         industry: values.industry || undefined,
         country: values.country || undefined,
-        website: values.website || undefined,
+        website: cleanWebsite,
         email_domain: values.emailDomain || undefined,
       };
       if (Object.values(companyPayload).some(Boolean)) {
@@ -67,7 +99,7 @@ function ProfileForm() {
       return values;
     },
     onSuccess: () => { toast.success("Profile updated"); qc.invalidateQueries({ queryKey: ["settings-profile"] }); },
-    onError: (e) => toast.error(e?.response?.data?.detail || "Failed"),
+    onError: (e) => toast.error(getApiErrorMessage(e, "Failed to update profile")),
   });
   return (
     <Card className="max-w-2xl p-6">
@@ -84,7 +116,7 @@ function ProfileForm() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5"><Label>Country</Label><Input {...form.register("country")} /></div>
-          <div className="space-y-1.5"><Label>Website</Label><Input {...form.register("website")} />{form.formState.errors.website && <p className="text-xs text-destructive">{form.formState.errors.website.message}</p>}</div>
+          <div className="space-y-1.5"><Label>Website</Label><Input {...form.register("website")} placeholder="acme.com" />{form.formState.errors.website && <p className="text-xs text-destructive">{form.formState.errors.website.message}</p>}</div>
         </div>
         <div className="flex justify-end"><Button type="submit" disabled={save.isPending}>Save changes</Button></div>
       </form>
@@ -97,13 +129,13 @@ function PasswordForm() {
   const save = useMutation({
     mutationFn: (values) => settingsApi.changePassword({ old_password: values.currentPassword, new_password: values.newPassword }),
     onSuccess: () => { toast.success("Password updated"); form.reset(); },
-    onError: (e) => toast.error(e?.response?.data?.detail || "Failed"),
+    onError: (e) => toast.error(getApiErrorMessage(e, "Failed to update password")),
   });
   return (
     <Card className="max-w-2xl p-6">
       <form className="space-y-4" onSubmit={form.handleSubmit((v) => save.mutate(v))}>
         <div className="space-y-1.5"><Label>Current password</Label><Input type="password" {...form.register("currentPassword")} />{form.formState.errors.currentPassword && <p className="text-xs text-destructive">{form.formState.errors.currentPassword.message}</p>}</div>
-        <div className="space-y-1.5"><Label>New password</Label><Input type="password" {...form.register("newPassword")} />{form.formState.errors.newPassword && <p className="text-xs text-destructive">{form.formState.errors.newPassword.message}</p>}</div>
+        <div className="space-y-1.5"><Label>New password</Label><Input type="password" placeholder="At least 8 chars, uppercase, number & symbol" {...form.register("newPassword")} />{form.formState.errors.newPassword && <p className="text-xs text-destructive">{form.formState.errors.newPassword.message}</p>}</div>
         <div className="space-y-1.5"><Label>Confirm new password</Label><Input type="password" {...form.register("confirm")} />{form.formState.errors.confirm && <p className="text-xs text-destructive">{form.formState.errors.confirm.message}</p>}</div>
         <div className="flex justify-end"><Button type="submit" disabled={save.isPending}>Update password</Button></div>
       </form>

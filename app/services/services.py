@@ -404,61 +404,134 @@ class AuthService:
 
     def register_company_and_admin(self, reg_data: dict) -> Tuple[User, Company, str, str]:
         """
-        Executes a transactional registration: Creates a Company profile
-        and registers a COMPANY_ADMIN user under that company.
+        Executes a transactional registration: validates all user and company inputs upfront,
+        creates the Company profile and COMPANY_ADMIN user, and rolls back cleanly if any failure occurs.
         """
-        # Start transaction explicitly
-        company_in = {
-            "name": reg_data["company_name"],
-            "registration_number": reg_data["registration_number"],
-            "country": reg_data["country"],
-            "industry": reg_data.get("industry"),
-            "website": reg_data.get("website"),
-            "wallet_address": reg_data.get("wallet_address")
-        }
-        
-        # 1. Create company profile
-        company = self.company_service.create_company(company_in)
+        # --- Upfront Validation ---
+        # 1. User validation
+        email = reg_data.get("email", "").strip()
+        if not email or not validate_email(email):
+            raise BusinessRuleException("Invalid email format")
+        if self.user_repo.find_one(email=email):
+            raise DuplicateResourceException("A user with this email already exists")
 
-        # 2. Create company admin user
+        password = reg_data.get("password")
+        if not password:
+            raise BusinessRuleException("Password is required")
+        pwd_failures = validate_password_strength(password)
+        if pwd_failures:
+            raise BusinessRuleException(f"Weak password: {', '.join(pwd_failures)}", errors=pwd_failures)
+
+        first_name = reg_data.get("first_name", "").strip()
+        last_name = reg_data.get("last_name", "").strip()
+        if not first_name or not last_name:
+            raise BusinessRuleException("First and last name are required")
+
+        # 2. Company validation
+        company_name = reg_data.get("company_name", "").strip()
+        if not company_name:
+            raise BusinessRuleException("Company name is required")
+        if self.company_repo.find_one(name=company_name):
+            raise DuplicateResourceException("Company name is already taken")
+
+        registration_number = reg_data.get("registration_number", "").strip()
+        if not registration_number:
+            raise BusinessRuleException("Registration number is required")
+        if self.company_repo.find_one(registration_number=registration_number):
+            raise DuplicateResourceException("Registration number is already registered")
+
+        country = reg_data.get("country", "").strip()
+        if not country:
+            raise BusinessRuleException("Country is required")
+
+        industry = reg_data.get("industry")
+        website = reg_data.get("website")
+        wallet = reg_data.get("wallet_address")
+
+        if wallet:
+            wallet = str(wallet).strip()
+            if not validate_wallet_address(wallet):
+                raise BusinessRuleException("Invalid blockchain wallet format")
+            if self.company_repo.find_one(wallet_address=wallet):
+                raise DuplicateResourceException("Wallet address is already registered")
+        else:
+            wallet = None
+
+        company_in = {
+            "name": company_name,
+            "registration_number": registration_number,
+            "country": country,
+            "industry": str(industry).strip() if industry else None,
+            "website": str(website).strip() if website else None,
+            "wallet_address": wallet
+        }
+
         user_in = {
-            "email": reg_data["email"],
-            "first_name": reg_data["first_name"],
-            "last_name": reg_data["last_name"],
-            "password": reg_data["password"],
+            "email": email,
+            "first_name": first_name,
+            "last_name": last_name,
+            "password": password,
             "role": UserRole.COMPANY_ADMIN
         }
-        user = self.user_service.create_user(user_in, company_id=company.id)
 
-        # 3. Generate initial token pair
-        access_token, _ = create_access_token(user.id, user.role, company.id)
-        refresh_token, refresh_jti = create_refresh_token(user.id, user.role, company.id)
+        # --- Execution with Atomic Cleanup ---
+        company = None
+        user = None
+        try:
+            # 1. Create company profile
+            company = self.company_service.create_company(company_in)
 
-        # 4. Save refresh token in database
-        self.token_repo.create({
-            "token_jti": refresh_jti,
-            "user_id": user.id,
-            "expires_at": datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
-            "is_revoked": False
-        })
+            # 2. Create company admin user
+            user = self.user_service.create_user(user_in, company_id=company.id)
 
-        # Record audit log
-        self.audit_service.record_create(
-            user.id, company.id, "Company", company.id, {"name": company.name}
-        )
-        self.audit_service.record_create(
-            user.id, company.id, "User", user.id, {"email": user.email}
-        )
-        self.audit_service.record_event(
-            user_id=user.id,
-            company_id=company.id,
-            entity_type="User",
-            entity_id=user.id,
-            action="Register",
-            new_values={"email": user.email, "company_name": company.name}
-        )
+            # 3. Generate initial token pair
+            access_token, _ = create_access_token(user.id, user.role, company.id)
+            refresh_token, refresh_jti = create_refresh_token(user.id, user.role, company.id)
 
-        return user, company, access_token, refresh_token
+            # 4. Save refresh token in database
+            self.token_repo.create({
+                "token_jti": refresh_jti,
+                "user_id": user.id,
+                "expires_at": datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+                "is_revoked": False
+            })
+
+            # 5. Record audit logs
+            self.audit_service.record_create(
+                user.id, company.id, "Company", company.id, {"name": company.name}
+            )
+            self.audit_service.record_create(
+                user.id, company.id, "User", user.id, {"email": user.email}
+            )
+            self.audit_service.record_event(
+                user_id=user.id,
+                company_id=company.id,
+                entity_type="User",
+                entity_id=user.id,
+                action="Register",
+                new_values={"email": user.email, "company_name": company.name}
+            )
+
+            return user, company, access_token, refresh_token
+
+        except Exception as exc:
+            # Clean up partially created entities on any unexpected failure
+            if user and hasattr(user, "id"):
+                try:
+                    self.token_repo.db.query(RefreshToken).filter(RefreshToken.user_id == user.id).delete()
+                    self.audit_service.repository.db.query(AuditLog).filter(AuditLog.user_id == user.id).delete()
+                    self.user_repo.delete(user)
+                except Exception:
+                    pass
+            if company and hasattr(company, "id"):
+                try:
+                    self.audit_service.repository.db.query(AuditLog).filter(AuditLog.company_id == company.id).delete()
+                    self.company_repo.delete(company)
+                except Exception:
+                    pass
+            self.db.rollback()
+            raise exc
+
 
     def login_user(self, login_data: dict, ip: str, ua: str) -> Tuple[User, Optional[Company], str, str]:
         email = login_data.get("email")
