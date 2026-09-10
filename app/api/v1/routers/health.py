@@ -30,10 +30,15 @@ def health_check(db: Session = Depends(get_db)) -> APIResponse[dict]:
             cache_ok = False
             
     # Check blockchain status
-    from app.blockchain.service import BlockchainService
-    b_service = BlockchainService()
-    b_health = b_service.health_check()
+    b_health = {"blockchain_connected": False, "enabled": bool(settings.BLOCKCHAIN_ENABLED)}
+    try:
+        from app.blockchain.service import BlockchainService
+        b_service = BlockchainService()
+        b_health = b_service.health_check()
+    except Exception as be:
+        b_health = {"blockchain_connected": False, "enabled": bool(settings.BLOCKCHAIN_ENABLED), "error": str(be)}
     b_ok = not settings.BLOCKCHAIN_ENABLED or b_health.get("blockchain_connected", False)
+
 
     overall_ok = db_ok and cache_ok and b_ok
     status_str = "healthy" if overall_ok else "degraded"

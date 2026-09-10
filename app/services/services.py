@@ -112,11 +112,18 @@ class AuditService(BaseService[AuditLog]):
             "timestamp": datetime.now(timezone.utc)
         }
         log = self.repository.create(audit_in)
-        if entity_type != "AuditLog":
-            from app.blockchain.service import BlockchainService
-            b_service = BlockchainService()
-            b_service.submit_to_blockchain("AuditLog", log.id)
+        if entity_type != "AuditLog" and settings.BLOCKCHAIN_ENABLED:
+
+
+            try:
+                from app.blockchain.service import BlockchainService
+                b_service = BlockchainService()
+                b_service.submit_to_blockchain("AuditLog", log.id)
+            except Exception as e:
+                import logging
+                logging.getLogger("app.services").warning(f"Skipping blockchain sync for audit log {log.id}: {e}")
         return log
+
 
     def record_login(self, user_id: uuid.UUID, company_id: Optional[uuid.UUID], ip: str, ua: str) -> None:
         self.record_event(user_id, company_id, "User", user_id, "LOGIN", ip_address=ip, user_agent=ua)

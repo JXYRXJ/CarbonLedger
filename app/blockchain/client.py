@@ -37,7 +37,10 @@ class BlockchainClient:
         self.private_key: Optional[str] = None
 
         if settings.BLOCKCHAIN_ENABLED:
-            self.connect()
+            try:
+                self.connect()
+            except Exception as e:
+                logger.warning(f"Blockchain Client connection warning on init: {str(e)}")
 
     def connect(self) -> None:
         """Establishes or reconnects Web3 provider connection and loads the smart contract."""
@@ -79,11 +82,10 @@ class BlockchainClient:
             logger.info("Successfully established connection to blockchain node.")
 
         except Exception as e:
-            logger.error(f"Blockchain Client connection error: {str(e)}")
+            logger.warning(f"Blockchain Client connection unavailable: {str(e)}. Running in disconnected mode.")
             self.w3 = None
             self.contract = None
-            if not settings.is_testing:
-                raise BlockchainConnectionException(f"Node connection failed: {str(e)}")
+
 
     def _load_contract(self) -> None:
         """Loads contract ABI and initializes contract instance."""

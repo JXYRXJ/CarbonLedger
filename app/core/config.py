@@ -59,7 +59,8 @@ class Settings(BaseSettings):
     ]
 
     # Blockchain configuration
-    BLOCKCHAIN_ENABLED: bool = Field(default=True, env="BLOCKCHAIN_ENABLED")
+    BLOCKCHAIN_ENABLED: bool = Field(default=False, env="BLOCKCHAIN_ENABLED")
+
     WEB3_PROVIDER_URL: str = Field(default="http://localhost:8545", env="WEB3_PROVIDER_URL")
     CHAIN_ID: int = Field(default=1337, env="CHAIN_ID")
     PRIVATE_KEY: str = Field(default="", env="PRIVATE_KEY")
