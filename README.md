@@ -24,6 +24,30 @@ Designed following the principles of **Clean Architecture**, the application is 
 
 The system strictly adheres to **Clean Architecture** to ensure clean separation of concerns, robust testability, and decoupling of data access from core business processes.
 
+### 🌐 High-Level System Architecture
+
+![CarbonLedger High-Level System Architecture](docs/images/high_level_architecture.jpg)
+
+*Figure 1: High-level end-to-end architecture showing the React 19 Client SPA, Cloudflare Edge & Security, FastAPI ASGI Web Service & Background Workers, Redis In-Memory Cache (with transparent local fallback), Neon PostgreSQL Database Cluster, and Polygon Amoy Blockchain Verification Layer.*
+
+---
+
+### ⚙️ Low-Level Backend Architecture (FastAPI Internal Flow)
+
+![CarbonLedger Low-Level Backend Architecture](docs/images/low_level_architecture.jpg)
+
+*Figure 2: Detailed low-level execution flow through the 5 internal backend layers: Middleware Stack (CORS, Sliding-Window Rate Limiting, OWASP Security Headers & Data Masking, Size Limits), API Routers Layer (Pydantic v2 schemas & RBAC dependency injection), Service Layer (Business Logic & Atomic Locks), Repository Layer (SQLAlchemy 2.0 eager loading optimization), and PostgreSQL Data Models alongside Asynchronous Workers.*
+
+---
+
+### 🗄️ Database Schema & Entity Relationship Diagram (ERD)
+
+![CarbonLedger Database Schema Diagram](docs/images/database_schema_diagram.jpg)
+
+*Figure 3: Complete PostgreSQL Entity-Relationship Diagram (ERD) showing all 13 tables, UUIDv4 primary keys, foreign key constraints, column data types, and cardinality relationships across the credit lifecycle.*
+
+---
+
 ```mermaid
 graph TD
     API[API Layer: Routers & Controllers] -->|Invokes| Service[Service Layer: Core Business Logic]
